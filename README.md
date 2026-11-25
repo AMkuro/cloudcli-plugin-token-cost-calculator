@@ -13,9 +13,10 @@ Token Cost Calculator is a CloudCLI tab plugin that reads your real Claude Code 
 
 ## What it does (in plain English)
 
-- **Auto-detect your real usage.** No copy-pasting from a billing page. The plugin scans the JSONL transcript files Claude Code already writes to your disk, extracts actual `input_tokens`, `output_tokens`, `cache_read_input_tokens`, and `cache_creation_input_tokens`, and multiplies by the price you set.
+- **Auto-detect your real usage.** No copy-pasting from a billing page. The plugin scans the JSONL transcript files Claude Code already writes to your disk, extracts actual `input_tokens`, `output_tokens`, `cache_read_input_tokens`, and `cache_creation_input_tokens`, and multiplies by the price you set. Cache reads and cache writes (5-minute and 1-hour TTL) are priced separately, as Anthropic bills them.
 - **Five ways to slice the data.** Manual entry for quick estimates. Auto-detect for the current session. Project mode for "how much did this entire repo cost me?" All-time for total spending. Daily mode with a date picker (defaults to today) so you can check "what did I spend last Tuesday?"
-- **Built-in model prices.** Claude Opus 4.7, Sonnet 4.6, Haiku 4.5, GPT-4o, GPT-4o-mini, Gemini 2.5 Pro/Flash, DeepSeek V4 Pro — pick from the dropdown or type your own custom pricing per 1M tokens.
+- **API-billed turns only.** Tick "Agent SDK turns only" to count just the turns sent through the Claude Agent SDK (for example CloudCLI itself), which are billed to an API key, and skip interactive Claude Code CLI turns that a subscription may cover.
+- **Built-in model prices.** Claude Opus 5.5, Sonnet 5.5, Haiku 5.5, Opus 4.7, Sonnet 4.6, Haiku 4.5, GPT-4o, GPT-4o-mini, Gemini 2.5 Pro/Flash, DeepSeek V4 Pro — pick from the dropdown or type your own custom pricing per 1M tokens.
 - **Handles the weird stuff.** DeepSeek (and other reasoning models) emit multiple content blocks per turn (thinking + text + tool_use), each written as a separate JSONL entry with duplicate `message.usage`. The plugin deduplicates by `message.id` so you're not 3x overcounting. Sub-agent sessions (from Claude Code's Task tool) are scanned too.
 
 ---

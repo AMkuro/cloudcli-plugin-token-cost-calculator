@@ -18,16 +18,53 @@ interface ModelPricing {
   provider: string;
   inputPrice: number;
   outputPrice: number;
+  /** Cache read (cache hit) price. */
   cachedInputPrice: number;
+  /** Cache write price, 5-minute TTL. */
+  cacheWrite5mPrice: number;
+  /** Cache write price, 1-hour TTL. */
+  cacheWrite1hPrice: number;
 }
 
+// Anthropic bills cache writes at 1.25x (5-minute TTL) or 2x (1-hour TTL) the
+// input price. The other providers below charge nothing extra for writing to
+// the cache, so their write prices equal the input price.
 const PRESETS: ModelPricing[] = [
+  {
+    name: 'Claude Opus 5.5',
+    provider: 'Anthropic',
+    inputPrice: 4.0,
+    outputPrice: 20.0,
+    cachedInputPrice: 0.2,
+    cacheWrite5mPrice: 5.0,
+    cacheWrite1hPrice: 8.0,
+  },
+  {
+    name: 'Claude Sonnet 5.5',
+    provider: 'Anthropic',
+    inputPrice: 2.0,
+    outputPrice: 10.0,
+    cachedInputPrice: 0.1,
+    cacheWrite5mPrice: 2.5,
+    cacheWrite1hPrice: 4.0,
+  },
+  {
+    name: 'Claude Haiku 5.5',
+    provider: 'Anthropic',
+    inputPrice: 0.1,
+    outputPrice: 0.5,
+    cachedInputPrice: 0.01,
+    cacheWrite5mPrice: 0.125,
+    cacheWrite1hPrice: 0.2,
+  },
   {
     name: 'Claude Opus 4.7',
     provider: 'Anthropic',
-    inputPrice: 15.0,
-    outputPrice: 75.0,
-    cachedInputPrice: 1.5,
+    inputPrice: 5.0,
+    outputPrice: 25.0,
+    cachedInputPrice: 0.5,
+    cacheWrite5mPrice: 6.25,
+    cacheWrite1hPrice: 10.0,
   },
   {
     name: 'Claude Sonnet 4.6',
@@ -35,13 +72,17 @@ const PRESETS: ModelPricing[] = [
     inputPrice: 3.0,
     outputPrice: 15.0,
     cachedInputPrice: 0.3,
+    cacheWrite5mPrice: 3.75,
+    cacheWrite1hPrice: 6.0,
   },
   {
     name: 'Claude Haiku 4.5',
     provider: 'Anthropic',
-    inputPrice: 0.8,
-    outputPrice: 4.0,
-    cachedInputPrice: 0.08,
+    inputPrice: 1.0,
+    outputPrice: 5.0,
+    cachedInputPrice: 0.1,
+    cacheWrite5mPrice: 1.25,
+    cacheWrite1hPrice: 2.0,
   },
   {
     name: 'GPT-4o',
@@ -49,6 +90,8 @@ const PRESETS: ModelPricing[] = [
     inputPrice: 2.5,
     outputPrice: 10.0,
     cachedInputPrice: 1.25,
+    cacheWrite5mPrice: 2.5,
+    cacheWrite1hPrice: 2.5,
   },
   {
     name: 'GPT-4o-mini',
@@ -56,6 +99,8 @@ const PRESETS: ModelPricing[] = [
     inputPrice: 0.15,
     outputPrice: 0.6,
     cachedInputPrice: 0.075,
+    cacheWrite5mPrice: 0.15,
+    cacheWrite1hPrice: 0.15,
   },
   {
     name: 'Gemini 2.5 Pro',
@@ -63,6 +108,8 @@ const PRESETS: ModelPricing[] = [
     inputPrice: 1.25,
     outputPrice: 10.0,
     cachedInputPrice: 0.313,
+    cacheWrite5mPrice: 1.25,
+    cacheWrite1hPrice: 1.25,
   },
   {
     name: 'Gemini 2.5 Flash',
@@ -70,6 +117,8 @@ const PRESETS: ModelPricing[] = [
     inputPrice: 0.15,
     outputPrice: 0.6,
     cachedInputPrice: 0.038,
+    cacheWrite5mPrice: 0.15,
+    cacheWrite1hPrice: 0.15,
   },
   {
     name: 'DeepSeek V4 Pro',
@@ -77,15 +126,24 @@ const PRESETS: ModelPricing[] = [
     inputPrice: 0.6,
     outputPrice: 2.4,
     cachedInputPrice: 0.06,
+    cacheWrite5mPrice: 0.6,
+    cacheWrite1hPrice: 0.6,
   },
 ];
 
 // ── Session token reader ───────────────────────────────────────────────
 
-interface SessionUsage {
+/** Token counts split by how each kind is priced. */
+interface Tokens {
   inputTokens: number;
   outputTokens: number;
+  /** Cache read tokens. */
   cachedInputTokens: number;
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+}
+
+interface SessionUsage extends Tokens {
   turnCount: number;
   sessionId: string;
   projectPath: string;
@@ -93,58 +151,40 @@ interface SessionUsage {
   error?: string;
 }
 
-interface SessionSummary {
+interface SessionSummary extends Tokens {
   sessionId: string;
-  inputTokens: number;
-  outputTokens: number;
-  cachedInputTokens: number;
   turnCount: number;
   model: string;
 }
 
-interface ProjectUsage {
+interface ProjectUsage extends Tokens {
   projectPath: string;
-  inputTokens: number;
-  outputTokens: number;
-  cachedInputTokens: number;
   turnCount: number;
   sessionCount: number;
   sessions: SessionSummary[];
   error?: string;
 }
 
-interface AllUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cachedInputTokens: number;
+interface AllUsage extends Tokens {
   turnCount: number;
   sessionCount: number;
   projectCount: number;
-  projects: {
+  projects: (Tokens & {
     projectPath: string;
-    inputTokens: number;
-    outputTokens: number;
-    cachedInputTokens: number;
     turnCount: number;
     sessionCount: number;
-  }[];
+  })[];
   error?: string;
 }
 
-interface DailyUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cachedInputTokens: number;
+interface DailyUsage extends Tokens {
   turnCount: number;
   sessionCount: number;
-  days: {
+  days: (Tokens & {
     date: string;
-    inputTokens: number;
-    outputTokens: number;
-    cachedInputTokens: number;
     turnCount: number;
     sessionCount: number;
-  }[];
+  })[];
   error?: string;
 }
 
@@ -153,6 +193,50 @@ interface UsageFields {
   output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number;
+    ephemeral_1h_input_tokens?: number;
+  };
+}
+
+function emptyTokens(): Tokens {
+  return { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 };
+}
+
+function addTokens(acc: Tokens, t: Tokens): void {
+  acc.inputTokens += t.inputTokens;
+  acc.outputTokens += t.outputTokens;
+  acc.cachedInputTokens += t.cachedInputTokens;
+  acc.cacheWrite5mTokens += t.cacheWrite5mTokens;
+  acc.cacheWrite1hTokens += t.cacheWrite1hTokens;
+}
+
+function totalTokens(t: Tokens): number {
+  return t.inputTokens + t.outputTokens + t.cachedInputTokens + t.cacheWrite5mTokens + t.cacheWrite1hTokens;
+}
+
+/** Split one API call's usage into the kinds of tokens that are priced differently. */
+function usageTokens(u: UsageFields): Tokens {
+  const writes = u.cache_creation_input_tokens ?? 0;
+  // Transcripts without the TTL breakdown count every write as a 5-minute write.
+  const writes1h = u.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  return {
+    inputTokens: u.input_tokens ?? 0,
+    outputTokens: u.output_tokens ?? 0,
+    cachedInputTokens: u.cache_read_input_tokens ?? 0,
+    cacheWrite5mTokens: writes - writes1h,
+    cacheWrite1hTokens: writes1h,
+  };
+}
+
+/**
+ * With sdkOnly, count only turns sent through the Claude Agent SDK
+ * (entrypoint "sdk-cli", "sdk-py", "sdk-ts", ...), which are billed to an API
+ * key, and skip turns from the interactive Claude Code CLI (entrypoint "cli"),
+ * which a Claude subscription may cover instead.
+ */
+function skipEntry(entry: { entrypoint?: unknown }, sdkOnly: boolean): boolean {
+  return sdkOnly && !String(entry.entrypoint ?? '').startsWith('sdk');
 }
 
 /**
@@ -179,14 +263,9 @@ function normalizePath(p: string): string {
  */
 function encodeProjectPath(projectPath: string): string {
   const p = normalizePath(projectPath);
-  // C:\Users\... → C--Users-...
-  // Claude Code replaces \ : space _ and other special chars with -
-  return p
-    .replace(/^([A-Z]):\\/, '$1--')
-    .replace(/\\/g, '-')
-    .replace(/:/g, '-')
-    .replace(/ /g, '-')
-    .replace(/_/g, '-');
+  // Claude Code replaces every character other than A-Z, a-z and 0-9 with -:
+  // C:\Users\me\my_app → C--Users-me-my-app, /home/me/.config → -home-me--config
+  return p.replace(/[^a-zA-Z0-9]/g, '-');
 }
 
 /**
@@ -274,15 +353,11 @@ function findSession(projectPath: string, sessionId: string): { projectsDir: str
 /**
  * Parse a single JSONL file and accumulate token usage from assistant messages.
  */
-async function parseSessionFile(filePath: string): Promise<{ inputTokens: number; outputTokens: number; cachedInputTokens: number; turnCount: number; model: string }> {
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cachedInputTokens = 0;
-  let turnCount = 0;
-  let model = '';
+async function parseSessionFile(filePath: string, sdkOnly: boolean): Promise<Tokens & { turnCount: number; model: string }> {
+  const result = { ...emptyTokens(), turnCount: 0, model: '' };
 
   if (!fs.existsSync(filePath)) {
-    return { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, model: '' };
+    return result;
   }
 
   const rl = createInterface({
@@ -296,7 +371,7 @@ async function parseSessionFile(filePath: string): Promise<{ inputTokens: number
     if (!line.trim()) continue;
     try {
       const entry = JSON.parse(line);
-      if (entry.type !== 'assistant') continue;
+      if (entry.type !== 'assistant' || skipEntry(entry, sdkOnly)) continue;
 
       const usage = entry.message?.usage as UsageFields | undefined;
       if (!usage) continue;
@@ -310,28 +385,48 @@ async function parseSessionFile(filePath: string): Promise<{ inputTokens: number
         seenMsgIds.add(msgId);
       }
 
-      turnCount++;
-      inputTokens += usage.input_tokens ?? 0;
-      outputTokens += usage.output_tokens ?? 0;
-      cachedInputTokens += (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
+      result.turnCount++;
+      addTokens(result, usageTokens(usage));
 
-      if (!model && entry.message?.model) {
-        model = entry.message.model;
+      if (!result.model && entry.message?.model) {
+        result.model = entry.message.model;
       }
     } catch {
       // skip malformed lines
     }
   }
 
-  return { inputTokens, outputTokens, cachedInputTokens, turnCount, model };
+  return result;
+}
+
+/**
+ * Parse a session file plus its subagent transcripts (<session>/subagents/*.jsonl).
+ */
+async function parseSessionWithSubagents(projectsDir: string, sessionId: string, sdkOnly: boolean): Promise<Tokens & { turnCount: number; model: string }> {
+  const result = await parseSessionFile(path.join(projectsDir, `${sessionId}.jsonl`), sdkOnly);
+
+  const subagentsDir = path.join(projectsDir, sessionId, 'subagents');
+  if (fs.existsSync(subagentsDir)) {
+    try {
+      for (const sub of fs.readdirSync(subagentsDir, { withFileTypes: true })) {
+        if (sub.isFile() && sub.name.endsWith('.jsonl')) {
+          const r = await parseSessionFile(path.join(subagentsDir, sub.name), sdkOnly);
+          addTokens(result, r);
+          result.turnCount += r.turnCount;
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  return result;
 }
 
 /**
  * Read token usage from a Claude session JSONL file (including subagents).
  */
-async function getSessionUsage(projectPath: string, sessionId: string): Promise<SessionUsage> {
+async function getSessionUsage(projectPath: string, sessionId: string, sdkOnly: boolean): Promise<SessionUsage> {
   if (!projectPath || !sessionId) {
-    return { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, sessionId, projectPath, model: '', error: 'Missing projectPath or sessionId' };
+    return { ...emptyTokens(), turnCount: 0, sessionId, projectPath, model: '', error: 'Missing projectPath or sessionId' };
   }
 
   const found = findSession(projectPath, sessionId);
@@ -339,44 +434,14 @@ async function getSessionUsage(projectPath: string, sessionId: string): Promise<
     const encoded = encodeProjectPath(projectPath);
     const claudeDir = resolveClaudeDir();
     return {
-      inputTokens: 0, outputTokens: 0, cachedInputTokens: 0,
+      ...emptyTokens(),
       turnCount: 0, sessionId, projectPath, model: '',
       error: `Session not found. Looked in: ${path.join(claudeDir, 'projects', encoded)}. Try checking the project path and session ID.`,
     };
   }
 
-  const { projectsDir, sessionFile } = found;
-  const main = await parseSessionFile(sessionFile);
-
-  // Also parse subagent sessions
-  const subagentsDir = path.join(projectsDir, sessionId, 'subagents');
-  let subInput = 0;
-  let subOutput = 0;
-  let subCached = 0;
-  let subTurns = 0;
-
-  if (fs.existsSync(subagentsDir)) {
-    const entries = fs.readdirSync(subagentsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isFile() && entry.name.endsWith('.jsonl')) {
-        const sub = await parseSessionFile(path.join(subagentsDir, entry.name));
-        subInput += sub.inputTokens;
-        subOutput += sub.outputTokens;
-        subCached += sub.cachedInputTokens;
-        subTurns += sub.turnCount;
-      }
-    }
-  }
-
-  return {
-    inputTokens: main.inputTokens + subInput,
-    outputTokens: main.outputTokens + subOutput,
-    cachedInputTokens: main.cachedInputTokens + subCached,
-    turnCount: main.turnCount + subTurns,
-    sessionId,
-    projectPath,
-    model: main.model || 'unknown',
-  };
+  const usage = await parseSessionWithSubagents(found.projectsDir, sessionId, sdkOnly);
+  return { ...usage, sessionId, projectPath, model: usage.model || 'unknown' };
 }
 
 // ── Project / All-time scanners ───────────────────────────────────────
@@ -384,9 +449,9 @@ async function getSessionUsage(projectPath: string, sessionId: string): Promise<
 /**
  * Parse all sessions for a single project directory and return aggregate.
  */
-async function getProjectUsage(projectPath: string): Promise<ProjectUsage> {
+async function getProjectUsage(projectPath: string, sdkOnly: boolean): Promise<ProjectUsage> {
   if (!projectPath) {
-    return { projectPath: '', inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, sessionCount: 0, sessions: [], error: 'Missing projectPath' };
+    return { projectPath: '', ...emptyTokens(), turnCount: 0, sessionCount: 0, sessions: [], error: 'Missing projectPath' };
   }
 
   const encoded = encodeProjectPath(projectPath);
@@ -394,23 +459,19 @@ async function getProjectUsage(projectPath: string): Promise<ProjectUsage> {
   const projectsDir = path.join(claudeDir, 'projects', encoded);
 
   if (!fs.existsSync(projectsDir)) {
-    // Try findSession to locate by scanning
-    const claudeDirRoot = resolveClaudeDir();
     return {
       projectPath,
-      inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, sessionCount: 0, sessions: [],
-      error: `Project directory not found. Looked in: ${path.join(claudeDirRoot, 'projects', encoded)}`,
+      ...emptyTokens(), turnCount: 0, sessionCount: 0, sessions: [],
+      error: `Project directory not found. Looked in: ${projectsDir}`,
     };
   }
 
-  return scanProjectDir(projectsDir, projectPath);
+  return scanProjectDir(projectsDir, projectPath, sdkOnly);
 }
 
-async function scanProjectDir(projectsDir: string, projectPath: string): Promise<ProjectUsage> {
+async function scanProjectDir(projectsDir: string, projectPath: string, sdkOnly: boolean): Promise<ProjectUsage> {
   const sessions: SessionSummary[] = [];
-  let totalInput = 0;
-  let totalOutput = 0;
-  let totalCached = 0;
+  const total = emptyTokens();
   let totalTurns = 0;
 
   const entries = fs.readdirSync(projectsDir, { withFileTypes: true });
@@ -418,60 +479,21 @@ async function scanProjectDir(projectsDir: string, projectPath: string): Promise
     if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
 
     const sessionId = entry.name.replace(/\.jsonl$/, '');
-    const sessionFile = path.join(projectsDir, entry.name);
-    const main = await parseSessionFile(sessionFile);
+    const usage = await parseSessionWithSubagents(projectsDir, sessionId, sdkOnly);
 
-    // Include subagents
-    const subagentsDir = path.join(projectsDir, sessionId, 'subagents');
-    let subInput = 0;
-    let subOutput = 0;
-    let subCached = 0;
-    let subTurns = 0;
-
-    if (fs.existsSync(subagentsDir)) {
-      try {
-        const subEntries = fs.readdirSync(subagentsDir, { withFileTypes: true });
-        for (const sub of subEntries) {
-          if (sub.isFile() && sub.name.endsWith('.jsonl')) {
-            const r = await parseSessionFile(path.join(subagentsDir, sub.name));
-            subInput += r.inputTokens;
-            subOutput += r.outputTokens;
-            subCached += r.cachedInputTokens;
-            subTurns += r.turnCount;
-          }
-        }
-      } catch { /* ignore */ }
-    }
-
-    const sInput = main.inputTokens + subInput;
-    const sOutput = main.outputTokens + subOutput;
-    const sCached = main.cachedInputTokens + subCached;
-    const sTurns = main.turnCount + subTurns;
-
-    if (sInput > 0 || sOutput > 0) {
-      sessions.push({
-        sessionId,
-        inputTokens: sInput,
-        outputTokens: sOutput,
-        cachedInputTokens: sCached,
-        turnCount: sTurns,
-        model: main.model || 'unknown',
-      });
-      totalInput += sInput;
-      totalOutput += sOutput;
-      totalCached += sCached;
-      totalTurns += sTurns;
+    if (totalTokens(usage) > 0) {
+      sessions.push({ ...usage, sessionId, model: usage.model || 'unknown' });
+      addTokens(total, usage);
+      totalTurns += usage.turnCount;
     }
   }
 
   // Sort sessions by total tokens descending
-  sessions.sort((a, b) => (b.inputTokens + b.outputTokens + b.cachedInputTokens) - (a.inputTokens + a.outputTokens + a.cachedInputTokens));
+  sessions.sort((a, b) => totalTokens(b) - totalTokens(a));
 
   return {
     projectPath,
-    inputTokens: totalInput,
-    outputTokens: totalOutput,
-    cachedInputTokens: totalCached,
+    ...total,
     turnCount: totalTurns,
     sessionCount: sessions.length,
     sessions,
@@ -481,21 +503,19 @@ async function scanProjectDir(projectsDir: string, projectPath: string): Promise
 /**
  * Scan ALL projects under ~/.claude/projects and return aggregate.
  */
-async function getAllUsage(): Promise<AllUsage> {
+async function getAllUsage(sdkOnly: boolean): Promise<AllUsage> {
   const claudeDir = resolveClaudeDir();
   const projectsRoot = path.join(claudeDir, 'projects');
 
   if (!fs.existsSync(projectsRoot)) {
     return {
-      inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, sessionCount: 0, projectCount: 0, projects: [],
+      ...emptyTokens(), turnCount: 0, sessionCount: 0, projectCount: 0, projects: [],
       error: `Projects directory not found: ${projectsRoot}`,
     };
   }
 
   const projects: AllUsage['projects'] = [];
-  let totalInput = 0;
-  let totalOutput = 0;
-  let totalCached = 0;
+  const total = emptyTokens();
   let totalTurns = 0;
   let totalSessions = 0;
 
@@ -506,32 +526,22 @@ async function getAllUsage(): Promise<AllUsage> {
     const projectDir = path.join(projectsRoot, dir.name);
     // Decode project path for display (reverse of encode)
     const decodedPath = decodeProjectPath(dir.name);
-    const usage = await scanProjectDir(projectDir, decodedPath);
+    const usage = await scanProjectDir(projectDir, decodedPath, sdkOnly);
 
     if (usage.sessionCount > 0) {
-      projects.push({
-        projectPath: decodedPath,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        cachedInputTokens: usage.cachedInputTokens,
-        turnCount: usage.turnCount,
-        sessionCount: usage.sessionCount,
-      });
-      totalInput += usage.inputTokens;
-      totalOutput += usage.outputTokens;
-      totalCached += usage.cachedInputTokens;
+      const { sessions: _sessions, error: _error, ...summary } = usage;
+      projects.push(summary);
+      addTokens(total, usage);
       totalTurns += usage.turnCount;
       totalSessions += usage.sessionCount;
     }
   }
 
   // Sort projects by total tokens descending
-  projects.sort((a, b) => (b.inputTokens + b.outputTokens + b.cachedInputTokens) - (a.inputTokens + a.outputTokens + a.cachedInputTokens));
+  projects.sort((a, b) => totalTokens(b) - totalTokens(a));
 
   return {
-    inputTokens: totalInput,
-    outputTokens: totalOutput,
-    cachedInputTokens: totalCached,
+    ...total,
     turnCount: totalTurns,
     sessionCount: totalSessions,
     projectCount: projects.length,
@@ -554,19 +564,19 @@ function decodeProjectPath(encoded: string): string {
 /**
  * Scan all sessions across all projects and aggregate token usage by day.
  */
-async function getDailyUsage(): Promise<DailyUsage> {
+async function getDailyUsage(sdkOnly: boolean): Promise<DailyUsage> {
   const claudeDir = resolveClaudeDir();
   const projectsRoot = path.join(claudeDir, 'projects');
 
   if (!fs.existsSync(projectsRoot)) {
     return {
-      inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, sessionCount: 0, days: [],
+      ...emptyTokens(), turnCount: 0, sessionCount: 0, days: [],
       error: `Projects directory not found: ${projectsRoot}`,
     };
   }
 
   // Map from date string (YYYY-MM-DD) to aggregate
-  const dayMap = new Map<string, { inputTokens: number; outputTokens: number; cachedInputTokens: number; turnCount: number; sessions: Set<string> }>();
+  const dayMap = new Map<string, Tokens & { turnCount: number; sessions: Set<string> }>();
 
   const dirEntries = fs.readdirSync(projectsRoot, { withFileTypes: true });
   for (const dir of dirEntries) {
@@ -581,17 +591,15 @@ async function getDailyUsage(): Promise<DailyUsage> {
 
       const sessionId = file.name.replace(/\.jsonl$/, '');
       const sessionFile = path.join(projectDir, file.name);
-      const dailySessions = await parseDailyFile(sessionFile, sessionId);
+      const dailySessions = await parseDailyFile(sessionFile, sdkOnly);
 
       for (const [date, usage] of dailySessions) {
         let day = dayMap.get(date);
         if (!day) {
-          day = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0, sessions: new Set() };
+          day = { ...emptyTokens(), turnCount: 0, sessions: new Set() };
           dayMap.set(date, day);
         }
-        day.inputTokens += usage.inputTokens;
-        day.outputTokens += usage.outputTokens;
-        day.cachedInputTokens += usage.cachedInputTokens;
+        addTokens(day, usage);
         day.turnCount += usage.turnCount;
         day.sessions.add(sessionId);
       }
@@ -599,34 +607,22 @@ async function getDailyUsage(): Promise<DailyUsage> {
   }
 
   // Build sorted array
-  let totalInput = 0;
-  let totalOutput = 0;
-  let totalCached = 0;
+  const total = emptyTokens();
   let totalTurns = 0;
   const allSessions = new Set<string>();
 
   const days = Array.from(dayMap.entries())
     .sort(([a], [b]) => a.localeCompare(b)) // chronological
     .map(([date, d]) => {
-      totalInput += d.inputTokens;
-      totalOutput += d.outputTokens;
-      totalCached += d.cachedInputTokens;
+      addTokens(total, d);
       totalTurns += d.turnCount;
       d.sessions.forEach((s) => allSessions.add(s));
-      return {
-        date,
-        inputTokens: d.inputTokens,
-        outputTokens: d.outputTokens,
-        cachedInputTokens: d.cachedInputTokens,
-        turnCount: d.turnCount,
-        sessionCount: d.sessions.size,
-      };
+      const { sessions, ...tokens } = d;
+      return { date, ...tokens, sessionCount: sessions.size };
     });
 
   return {
-    inputTokens: totalInput,
-    outputTokens: totalOutput,
-    cachedInputTokens: totalCached,
+    ...total,
     turnCount: totalTurns,
     sessionCount: allSessions.size,
     days,
@@ -639,9 +635,9 @@ async function getDailyUsage(): Promise<DailyUsage> {
  */
 async function parseDailyFile(
   filePath: string,
-  _sessionId: string,
-): Promise<Map<string, { inputTokens: number; outputTokens: number; cachedInputTokens: number; turnCount: number }>> {
-  const dayMap = new Map<string, { inputTokens: number; outputTokens: number; cachedInputTokens: number; turnCount: number }>();
+  sdkOnly: boolean,
+): Promise<Map<string, Tokens & { turnCount: number }>> {
+  const dayMap = new Map<string, Tokens & { turnCount: number }>();
 
   if (!fs.existsSync(filePath)) return dayMap;
 
@@ -656,7 +652,7 @@ async function parseDailyFile(
     if (!line.trim()) continue;
     try {
       const entry = JSON.parse(line);
-      if (entry.type !== 'assistant') continue;
+      if (entry.type !== 'assistant' || skipEntry(entry, sdkOnly)) continue;
 
       const usage = entry.message?.usage as UsageFields | undefined;
       if (!usage) continue;
@@ -677,12 +673,10 @@ async function parseDailyFile(
 
       let day = dayMap.get(date);
       if (!day) {
-        day = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, turnCount: 0 };
+        day = { ...emptyTokens(), turnCount: 0 };
         dayMap.set(date, day);
       }
-      day.inputTokens += usage.input_tokens ?? 0;
-      day.outputTokens += usage.output_tokens ?? 0;
-      day.cachedInputTokens += (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
+      addTokens(day, usageTokens(usage));
       day.turnCount++;
     } catch {
       // skip malformed lines
@@ -707,6 +701,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url || '/', 'http://localhost');
+  // ?sdkOnly=1 counts only Agent SDK turns (see skipEntry)
+  const sdkOnly = url.searchParams.get('sdkOnly') === '1';
 
   // GET /presets — return all preset model pricing
   if (req.method === 'GET' && (url.pathname === '/presets' || url.pathname === '//presets')) {
@@ -727,7 +723,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const usage = await getSessionUsage(projectPath, sessionId);
+      const usage = await getSessionUsage(projectPath, sessionId, sdkOnly);
       res.writeHead(200);
       res.end(JSON.stringify(usage));
     } catch (err) {
@@ -743,18 +739,24 @@ const server = http.createServer(async (req, res) => {
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
       try {
-        const { inputPrice, outputPrice, cachedInputPrice, inputTokens, outputTokens, cachedInputTokens } = JSON.parse(body);
+        const {
+          inputPrice, outputPrice, cachedInputPrice, cacheWrite5mPrice = 0, cacheWrite1hPrice = 0,
+          inputTokens, outputTokens, cachedInputTokens, cacheWrite5mTokens = 0, cacheWrite1hTokens = 0,
+        } = JSON.parse(body);
 
         const inputCost = (inputTokens / 1_000_000) * inputPrice;
         const outputCost = (outputTokens / 1_000_000) * outputPrice;
         const cachedInputCost = (cachedInputTokens / 1_000_000) * cachedInputPrice;
-        const total = inputCost + outputCost + cachedInputCost;
+        const cacheWriteCost = (cacheWrite5mTokens / 1_000_000) * cacheWrite5mPrice
+          + (cacheWrite1hTokens / 1_000_000) * cacheWrite1hPrice;
+        const total = inputCost + outputCost + cachedInputCost + cacheWriteCost;
 
         res.writeHead(200);
         res.end(JSON.stringify({
           inputCost: Math.round(inputCost * 10000) / 10000,
           outputCost: Math.round(outputCost * 10000) / 10000,
           cachedInputCost: Math.round(cachedInputCost * 10000) / 10000,
+          cacheWriteCost: Math.round(cacheWriteCost * 10000) / 10000,
           total: Math.round(total * 10000) / 10000,
         }));
       } catch (err) {
@@ -774,7 +776,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     try {
-      const usage = await getProjectUsage(projectPath);
+      const usage = await getProjectUsage(projectPath, sdkOnly);
       res.writeHead(200);
       res.end(JSON.stringify(usage));
     } catch (err) {
@@ -787,7 +789,7 @@ const server = http.createServer(async (req, res) => {
   // GET /all-usage — sum of all sessions across all projects
   if (req.method === 'GET' && (url.pathname === '/all-usage' || url.pathname === '//all-usage')) {
     try {
-      const usage = await getAllUsage();
+      const usage = await getAllUsage(sdkOnly);
       res.writeHead(200);
       res.end(JSON.stringify(usage));
     } catch (err) {
@@ -800,7 +802,7 @@ const server = http.createServer(async (req, res) => {
   // GET /daily-usage — token usage aggregated by day across all projects
   if (req.method === 'GET' && (url.pathname === '/daily-usage' || url.pathname === '//daily-usage')) {
     try {
-      const usage = await getDailyUsage();
+      const usage = await getDailyUsage(sdkOnly);
       res.writeHead(200);
       res.end(JSON.stringify(usage));
     } catch (err) {

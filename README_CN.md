@@ -12,9 +12,10 @@ Token Cost Calculator 是一个 CloudCLI 标签页插件，直接读取 Claude C
 
 ## 这个插件到底能干啥（说人话版）
 
-- **自动读取真实用量。** 不用去账单页复制粘贴。插件自动扫描 Claude Code 存在你硬盘上的 JSONL 会话文件，提取 `input_tokens`、`output_tokens`、`cache_read_input_tokens`、`cache_creation_input_tokens`，乘以你设的价格，算出花了多少钱。
+- **自动读取真实用量。** 不用去账单页复制粘贴。插件自动扫描 Claude Code 存在你硬盘上的 JSONL 会话文件，提取 `input_tokens`、`output_tokens`、`cache_read_input_tokens`、`cache_creation_input_tokens`，乘以你设的价格，算出花了多少钱。缓存读取和缓存写入（5 分钟与 1 小时 TTL）按 Anthropic 的计费方式分别计价。
 - **五种角度看数据。** Manual（手动模式）适合快速估算；Auto-detect（自动检测）看当前会话；Project（项目模式）回答"这个仓库总共花了多少"；All-time（全局模式）看从安装到现在的总账；Daily（每日模式）带日期选择器，默认显示今天，可以翻到"上周二花了多少"。
-- **内置模型价格表。** Claude Opus 4.7、Sonnet 4.6、Haiku 4.5、GPT-4o、GPT-4o-mini、Gemini 2.5 Pro/Flash、DeepSeek V4 Pro —— 下拉菜单直接选，也支持自己填每百万 token 的自定义价格。
+- **只算 API 计费的轮次。** 勾选 "Agent SDK turns only" 后，只统计通过 Claude Agent SDK（例如 CloudCLI 本身）发出、计入 API key 账单的轮次，跳过可能由订阅覆盖的 Claude Code CLI 交互轮次。
+- **内置模型价格表。** Claude Opus 5.5、Sonnet 5.5、Haiku 5.5、Opus 4.7、Sonnet 4.6、Haiku 4.5、GPT-4o、GPT-4o-mini、Gemini 2.5 Pro/Flash、DeepSeek V4 Pro —— 下拉菜单直接选，也支持自己填每百万 token 的自定义价格。
 - **处理坑爹的边界情况。** DeepSeek 这类推理模型，一个 API 调用会产出一串内容块（思考 → 正文 → 工具调用），每个块在 JSONL 里单独占一行，但 `message.usage` 是完全相同的。插件靠 `message.id` 去重，不会把同一轮对话的 token 数翻 3 倍。子代理会话（Claude Code 的 Task 工具调用的）也会一并统计。
 
 ---
